@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fragility Persistence Matrix — Strawberry Canyon</title>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #f9f8f5;
+    --surface: #ffffff;
+    --border: rgba(0,0,0,0.10);
+    --text-primary: #1a1a18;
+    --text-secondary: #5f5e5a;
+    --text-tertiary: #888780;
+    --radius: 10px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1a1a18;
+      --surface: #222220;
+      --border: rgba(255,255,255,0.09);
+      --text-primary: #e8e6de;
+      --text-secondary: #9c9a92;
+      --text-tertiary: #5f5e5a;
+    }
+  }
+
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    font-size: 14px;
+    line-height: 1.6;
+    padding: 2rem 1.5rem;
+    min-height: 100vh;
+  }
+
+  .wrap {
+    max-width: 860px;
+    margin: 0 auto;
+  }
+
+  header {
+    margin-bottom: 1.5rem;
+    border-bottom: 0.5px solid var(--border);
+    padding-bottom: 1rem;
+  }
+
+  header h1 {
+    font-size: 18px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    margin-bottom: 3px;
+  }
+
+  header p {
+    font-size: 11px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    color: var(--text-tertiary);
+  }
+
+  .card {
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 520px;
+  }
+
+  #fpm-tooltip {
+    position: absolute;
+    background: var(--surface);
+    border: 0.5px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 12px;
+    font-size: 12px;
+    color: var(--text-primary);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    white-space: nowrap;
+    z-index: 10;
+  }
+
+  #fpm-tooltip .sym { font-weight: 500; font-size: 13px; }
+  #fpm-tooltip .chg { color: var(--text-tertiary); font-size: 10px; margin-left: 6px; }
+  #fpm-tooltip .row { color: var(--text-secondary); margin-top: 2px; }
+  #fpm-tooltip .val { color: var(--text-primary); }
+
+  #ql-overlay {
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    pointer-events: none;
+  }
+
+  .ql {
+    position: absolute;
+    font-size: 10px;
+    letter-spacing: 0.07em;
+    text-transform: uppercase;
+    line-height: 1.4;
+  }
+
+  .legend {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+    align-items: center;
+    font-size: 11px;
+    color: var(--text-secondary);
+    margin-top: 10px;
+  }
+
+  .swatch {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 4px;
+    vertical-align: middle;
+  }
+
+  .meta {
+    font-size: 11px;
+    color: var(--text-tertiary);
+    margin-top: 1.25rem;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 0.5rem 1.5rem;
+  }
+
+  .meta-item { display: flex; flex-direction: column; gap: 2px; }
+  .meta-label { font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-tertiary); }
+  .meta-val { font-size: 12px; color: var(--text-secondary); }
+
+  footer {
+    margin-top: 2rem;
+    font-size: 11px;
+    color: var(--text-tertiary);
+    border-top: 0.5px solid var(--border);
+    padding-top: 1rem;
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <h1>Fragility Persistence Matrix</h1>
+    <p>Strawberry Canyon &nbsp;·&nbsp; Temporal Fragility Topology &nbsp;·&nbsp; Intraday Propagation vs Overnight Continuation</p>
+  </header>
+
+  <div class="card">
+    <div class="chart-wrap">
+      <canvas id="fpm" role="img" aria-label="Scatter plot of FRAGILITY_1530 vs FRAGILITY_1930 for 43 symbols. Bubble size encodes ATRP_RATIO; color encodes SUI.">Fragility Persistence Matrix: 43 symbols plotted across intraday and overnight fragility dimensions.</canvas>
+      <div id="fpm-tooltip"></div>
+      <div id="ql-overlay"></div>
+    </div>
+    <div class="legend">
+      <span style="font-weight:500;color:var(--text-secondary)">SUI</span>
+      <span><span class="swatch" style="background:#185FA5"></span>low utilization</span>
+      <span><span class="swatch" style="background:#1D9E75"></span>mid range</span>
+      <span><span class="swatch" style="background:#BA7517"></span>elevated</span>
+      <span><span class="swatch" style="background:#D85A30"></span>high exhaustion</span>
+      <span style="color:var(--text-tertiary);margin-left:8px">· bubble size = ATRP ratio</span>
+    </div>
+  </div>
+
+  <div class="meta">
+    <div class="meta-item">
+      <span class="meta-label">X-axis</span>
+      <span class="meta-val">FRAGILITY_1530 — intraday terminal propagation</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Y-axis</span>
+      <span class="meta-val">FRAGILITY_1930 — overnight continuation / absorption</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Bubble size</span>
+      <span class="meta-val">ATRP_RATIO — short-term vs medium-term vol expansion</span>
+    </div>
+    <div class="meta-item">
+      <span class="meta-label">Color</span>
+      <span class="meta-val">SUI — Scroll Utilization Index (range exhaustion)</span>
+    </div>
+  </div>
+
+  <footer>
+    <span>Strawberry Canyon — embodied phenomenological trend model</span>
+    <span>Not investment advice. Proprietary framework.</span>
+  </footer>
+
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+const DATA = [
+  { s:'AAPL', f15:1.478,  f19:-3.893, ratio:1.00, sui:1.09, chg:2.36   },
+  { s:'AMD',  f15:-4.377, f19:-4.588, ratio:1.24, sui:0.61, chg:-6.83  },
+  { s:'AMZN', f15:-2.130, f19:-1.000, ratio:0.98, sui:0.54, chg:-3.13  },
+  { s:'ARM',  f15:-5.096, f19:-3.795, ratio:1.16, sui:0.51, chg:-1.93  },
+  { s:'AVGO', f15:-3.648, f19:-2.531, ratio:1.12, sui:0.77, chg:-1.12  },
+  { s:'BAC',  f15:-0.340, f19:1.259,  ratio:0.96, sui:0.62, chg:-3.00  },
+  { s:'COIN', f15:-4.273, f19:-0.888, ratio:1.13, sui:0.90, chg:-2.85  },
+  { s:'EEM',  f15:-7.622, f19:-0.636, ratio:1.08, sui:0.51, chg:-4.22  },
+  { s:'F',    f15:-5.430, f19:0.500,  ratio:1.33, sui:1.14, chg:8.77   },
+  { s:'GLD',  f15:-6.105, f19:-1.571, ratio:0.89, sui:0.67, chg:-3.80  },
+  { s:'GOOGL',f15:-1.904, f19:-1.813, ratio:1.05, sui:0.65, chg:-1.00  },
+  { s:'HOOD', f15:-3.835, f19:-1.855, ratio:0.99, sui:0.49, chg:0.14   },
+  { s:'HYG',  f15:-5.444, f19:-0.750, ratio:0.90, sui:0.81, chg:-0.85  },
+  { s:'IBIT', f15:-5.604, f19:-1.962, ratio:0.94, sui:0.70, chg:-1.39  },
+  { s:'IGV',  f15:2.172,  f19:1.649,  ratio:0.99, sui:1.12, chg:0.69   },
+  { s:'INTC', f15:-3.511, f19:-2.348, ratio:1.31, sui:0.65, chg:-12.93 },
+  { s:'IWM',  f15:-5.762, f19:-1.778, ratio:0.98, sui:0.65, chg:-2.31  },
+  { s:'KWEB', f15:-6.193, f19:-1.759, ratio:1.12, sui:0.52, chg:-4.67  },
+  { s:'META', f15:-1.388, f19:-4.267, ratio:0.90, sui:0.75, chg:0.75   },
+  { s:'MRVL', f15:-1.868, f19:-2.737, ratio:1.21, sui:0.82, chg:3.97   },
+  { s:'MSFT', f15:4.552,  f19:-3.476, ratio:1.05, sui:1.38, chg:1.64   },
+  { s:'MSTR', f15:-3.255, f19:0.442,  ratio:1.11, sui:0.74, chg:-5.42  },
+  { s:'MU',   f15:-4.037, f19:-4.182, ratio:1.24, sui:0.60, chg:-2.97  },
+  { s:'NFLX', f15:0.161,  f19:-2.214, ratio:0.93, sui:1.14, chg:-0.54  },
+  { s:'NKE',  f15:-0.579, f19:-4.207, ratio:0.82, sui:0.93, chg:-5.12  },
+  { s:'NOW',  f15:4.903,  f19:-2.386, ratio:0.97, sui:0.96, chg:4.27   },
+  { s:'NVDA', f15:-4.420, f19:-3.833, ratio:1.15, sui:0.90, chg:4.70   },
+  { s:'ORCL', f15:-1.292, f19:-3.283, ratio:1.05, sui:0.82, chg:-1.53  },
+  { s:'PFE',  f15:-4.075, f19:-0.818, ratio:0.96, sui:1.10, chg:-1.36  },
+  { s:'PLTR', f15:0.247,  f19:-3.156, ratio:0.91, sui:0.58, chg:-2.76  },
+  { s:'QCOM', f15:0.479,  f19:-2.489, ratio:1.37, sui:0.51, chg:-8.03  },
+  { s:'QQQ',  f15:-3.683, f19:-4.160, ratio:1.03, sui:0.88, chg:-0.32  },
+  { s:'RKLB', f15:-2.632, f19:-1.284, ratio:1.23, sui:0.88, chg:18.30  },
+  { s:'SLV',  f15:-7.935, f19:-2.552, ratio:1.05, sui:0.43, chg:-5.44  },
+  { s:'SMH',  f15:-4.524, f19:-3.744, ratio:1.15, sui:0.73, chg:-1.80  },
+  { s:'SNDK', f15:1.053,  f19:-1.306, ratio:1.21, sui:1.08, chg:-9.90  },
+  { s:'SPY',  f15:-4.444, f19:-4.176, ratio:0.95, sui:0.74, chg:0.21   },
+  { s:'TLT',  f15:-8.706, f19:-0.600, ratio:1.01, sui:0.54, chg:-2.81  },
+  { s:'TSLA', f15:-5.398, f19:-4.680, ratio:1.09, sui:0.70, chg:-1.43  },
+  { s:'UNH',  f15:-2.368, f19:6.203,  ratio:1.00, sui:0.80, chg:3.65   },
+  { s:'USO',  f15:6.310,  f19:1.513,  ratio:0.93, sui:0.53, chg:10.96  },
+  { s:'XLE',  f15:6.211,  f19:2.800,  ratio:0.94, sui:0.81, chg:6.71   },
+  { s:'XLF',  f15:-1.036, f19:-2.750, ratio:0.89, sui:0.72, chg:-0.27  },
+];
+
+const EMPHASIS = new Set(['SPY','QQQ','TLT','HYG','XLE','UNH','MSFT','NVDA','TSLA']);
+
+const dark = matchMedia('(prefers-color-scheme: dark)').matches;
+
+function suiColor(v) {
+  if (v < 0.55) return '#185FA5';
+  if (v < 0.70) return '#1D9E75';
+  if (v < 0.90) return '#BA7517';
+  return '#D85A30';
+}
+function suiBorder(v) {
+  if (v < 0.55) return '#0C447C';
+  if (v < 0.70) return '#0F6E56';
+  if (v < 0.90) return '#854F0B';
+  return '#993C1D';
+}
+
+const gridColor   = dark ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.06)';
+const textColor   = dark ? 'rgba(200,198,190,0.85)' : 'rgba(60,60,58,0.85)';
+const axisColor   = dark ? 'rgba(180,178,169,0.65)' : 'rgba(95,94,90,0.75)';
+
+const bubbles = DATA.map(d => ({
+  x: d.f15, y: d.f19,
+  r: Math.max(5, Math.min(22, d.ratio * 13)),
+  ...d,
+  bg: suiColor(d.sui),
+  border: suiBorder(d.sui),
+  isEmphasis: EMPHASIS.has(d.s),
+}));
+
+const pluginLabels = {
+  id: 'labels',
+  afterDatasetsDraw(chart) {
+    const { ctx } = chart;
+    chart.getDatasetMeta(0).data.forEach((el, i) => {
+      const d = bubbles[i];
+      const r = el.options.radius;
+      ctx.save();
+      ctx.font = d.isEmphasis
+        ? '500 11px -apple-system, BlinkMacSystemFont, sans-serif'
+        : '10px -apple-system, BlinkMacSystemFont, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'top';
+      ctx.fillStyle = d.isEmphasis
+        ? (dark ? 'rgba(225,223,215,0.95)' : 'rgba(25,25,23,0.95)')
+        : (dark ? 'rgba(165,163,155,0.72)' : 'rgba(85,84,80,0.72)');
+      const ly = el.y - r - 13;
+      ctx.fillText(d.s, el.x, ly < 8 ? el.y + r + 3 : ly);
+      ctx.restore();
+    });
+  }
+};
+
+const pluginQuadrants = {
+  id: 'quadrants',
+  beforeDatasetsDraw(chart) {
+    const { ctx, chartArea: ca, scales } = chart;
+    const x0 = scales.x.getPixelForValue(0);
+    const y0 = scales.y.getPixelForValue(0);
+    const a = dark ? 0.055 : 0.032;
+    ctx.fillStyle = `rgba(186,117,23,${a})`;
+    ctx.fillRect(x0, ca.top, ca.right - x0, y0 - ca.top);
+    ctx.fillStyle = `rgba(29,158,117,${a})`;
+    ctx.fillRect(ca.left, ca.top, x0 - ca.left, y0 - ca.top);
+    ctx.fillStyle = `rgba(24,95,165,${a * 1.6})`;
+    ctx.fillRect(ca.left, y0, x0 - ca.left, ca.bottom - y0);
+    ctx.fillStyle = `rgba(216,90,48,${a})`;
+    ctx.fillRect(x0, y0, ca.right - x0, ca.bottom - y0);
+  }
+};
+
+const chart = new Chart(document.getElementById('fpm'), {
+  type: 'bubble',
+  plugins: [pluginQuadrants, pluginLabels],
+  data: {
+    datasets: [{
+      data: bubbles,
+      backgroundColor: bubbles.map(d => d.bg + 'cc'),
+      borderColor: bubbles.map(d => d.border),
+      borderWidth: bubbles.map(d => d.isEmphasis ? 1.5 : 0.8),
+    }]
+  },
+  options: {
+    responsive: true,
+    maintainAspectRatio: false,
+    layout: { padding: { top: 28, right: 20, bottom: 16, left: 10 } },
+    scales: {
+      x: {
+        title: { display: true, text: 'FRAGILITY_1530  —  intraday terminal propagation', color: axisColor, font: { size: 11 }, padding: { top: 8 } },
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 9 },
+        min: -10, max: 8,
+      },
+      y: {
+        title: { display: true, text: 'FRAGILITY_1930  —  overnight continuation / absorption', color: axisColor, font: { size: 11 }, padding: { bottom: 8 } },
+        grid: { color: gridColor },
+        ticks: { color: textColor, font: { size: 10 }, maxTicksLimit: 9 },
+        min: -6, max: 8,
+      }
+    },
+    plugins: {
+      legend: { display: false },
+      tooltip: {
+        enabled: false,
+        external(ctx) {
+          const tt = document.getElementById('fpm-tooltip');
+          if (ctx.tooltip.opacity === 0) { tt.style.opacity = 0; return; }
+          const d = ctx.tooltip.dataPoints?.[0]?.raw;
+          if (!d) return;
+          tt.innerHTML = `
+            <span class="sym">${d.s}</span><span class="chg">${d.chg > 0 ? '+' : ''}${d.chg.toFixed(2)}% 5D</span><br>
+            <span class="row">1530 fragility <span class="val">${d.f15.toFixed(3)}</span></span><br>
+            <span class="row">1930 fragility <span class="val">${d.f19.toFixed(3)}</span></span><br>
+            <span class="row">ATRP ratio <span class="val">${d.ratio.toFixed(2)}</span> &nbsp; SUI <span class="val">${d.sui.toFixed(2)}</span></span>
+          `;
+          const wrap = document.querySelector('.chart-wrap').getBoundingClientRect();
+          const tp = ctx.tooltip;
+          let lx = tp.caretX + 12;
+          let ly = tp.caretY - 10;
+          if (lx + 210 > wrap.width) lx = tp.caretX - 218;
+          tt.style.left = lx + 'px';
+          tt.style.top = ly + 'px';
+          tt.style.opacity = 1;
+        }
+      }
+    }
+  }
+});
+
+setTimeout(() => {
+  const { chartArea: ca, scales } = chart;
+  const x0 = scales.x.getPixelForValue(0);
+  const y0 = scales.y.getPixelForValue(0);
+  const overlay = document.getElementById('ql-overlay');
+  overlay.style.left = ca.left + 'px';
+  overlay.style.top = ca.top + 'px';
+  overlay.style.width = (ca.right - ca.left) + 'px';
+  overlay.style.height = (ca.bottom - ca.top) + 'px';
+
+  const qs = [
+    { label: 'Persistent propagation', sub: 'continuation · regime persistence',
+      color: dark ? 'rgba(200,155,60,0.65)' : 'rgba(120,80,10,0.60)',
+      right: (ca.right - ca.left) - (x0 - ca.left) + 8, top: 8, align: 'right' },
+    { label: 'Absorption / rescue', sub: 'event repricing · stabilization',
+      color: dark ? 'rgba(50,175,120,0.60)' : 'rgba(10,100,75,0.60)',
+      left: 8, top: 8, align: 'left' },
+    { label: 'Systemic continuation stress', sub: 'broad liquidation · macro propagation',
+      color: dark ? 'rgba(70,130,200,0.60)' : 'rgba(15,60,130,0.60)',
+      left: 8, bottom: 8, align: 'left' },
+    { label: 'Exhaustion / failed propagation', sub: 'distribution · reversal',
+      color: dark ? 'rgba(210,110,65,0.65)' : 'rgba(140,50,15,0.60)',
+      right: (ca.right - ca.left) - (x0 - ca.left) + 8, bottom: 8, align: 'right' },
+  ];
+
+  qs.forEach(q => {
+    const el = document.createElement('div');
+    el.className = 'ql';
+    el.style.color = q.color;
+    el.style.textAlign = q.align;
+    if (q.left !== undefined) el.style.left = q.left + 'px';
+    if (q.right !== undefined) el.style.right = q.right + 'px';
+    if (q.top !== undefined) el.style.top = q.top + 'px';
+    if (q.bottom !== undefined) el.style.bottom = q.bottom + 'px';
+    el.innerHTML = `<strong style="font-size:10px;font-weight:500">${q.label}</strong><br><span style="font-size:9px;opacity:0.75">${q.sub}</span>`;
+    overlay.appendChild(el);
+  });
+}, 300);
+</script>
+</body>
+</html>
